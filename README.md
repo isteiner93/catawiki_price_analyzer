@@ -5,6 +5,7 @@ This project is a tool for watch enthusiasts to analyze watch prices on Catawiki
 ## Description
 
 This script scrapes watch auction data from Catawiki, analyzes it using the Gemini API, and provides insights into pricing trends. It's a fun project for anyone interested in watches and data analysis.
+Data are returned and save, both in `.csv` and `.json` format 
 
 ## Features
 
@@ -51,3 +52,7 @@ You can customize the scraping process by modifying the following parameters in 
 
 *   This tool is not intended for commercial use.
 *   The Gemini API has a free tier with rate limits. Be mindful of the number of requests you make to avoid being rate-limited. For more information, see the Gemini API documentation.
+
+## Screenshots
+![img.png](img.png)
+![img_1.png](img_1.png)
