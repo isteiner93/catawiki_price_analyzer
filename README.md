@@ -54,5 +54,5 @@ You can customize the scraping process by modifying the following parameters in 
 *   The Gemini API has a free tier with rate limits. Be mindful of the number of requests you make to avoid being rate-limited. For more information, see the Gemini API documentation.
 
 ## Screenshots
-![img.png](img.png)
-![img_1.png](img_1.png)
+![img_2.png](assets/img_2.png)
+![img_1.png](assets/img_1.png)
