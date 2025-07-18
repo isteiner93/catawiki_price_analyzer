@@ -5,30 +5,35 @@ import time
 import json  # Import json for parsing Gemini API response
 from bs4 import BeautifulSoup  # Import BeautifulSoup for HTML parsing
 import numpy as np  # Import numpy for handling NaN values
+import urllib.parse  # Re-added: Needed for URL encoding in get_dynamic_build_id
 
 # Gemini API key will be provided by the environment, so we leave it empty here.
-GEMINI_API_KEY = "" # Input your own key
+# DO NOT hardcode your API key here.
+GEMINI_API_KEY = ""  # User provided key, keeping it.
 GEMINI_API_URL = "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent"
-
-# Base URL for the main watches page to extract the dynamic build ID
-CATAWIKI_WATCHES_PAGE_URL = "https://www.catawiki.com/en/c/333-watches"
-
-# Template for the dynamic API URL
-API_URL_TEMPLATE = "https://www.catawiki.com/_next/data/{build_id}/en/c/333-watches.json"
 
 # Constants for fee calculation
 CATAWIKI_BROKERAGE_FEE_PERCENTAGE = 0.09  # 9%
-FIXED_DELIVERY_FEE_EUR = 50.0  # Fixed delivery fee in EUR.
+FIXED_DELIVERY_FEE_EUR = 40.0  # Fixed delivery fee in EUR.
 
 
-def get_dynamic_base_url():
+def get_dynamic_build_id(search_query=None):
     """
-    Fetches the main Catawiki watches page to extract the dynamic build ID
-    and constructs the base API URL.
+    Fetches the main Catawiki page (either category or search) to extract the dynamic build ID.
     """
-    print(f"Fetching main page to get dynamic build ID from: {CATAWIKI_WATCHES_PAGE_URL}")
+    if search_query:
+        # For search queries, the URL structure for getting the build ID is different
+        # We need to URL-encode the search query for the initial page fetch
+        encoded_query = urllib.parse.quote_plus(search_query)
+        initial_url = f"https://www.catawiki.com/en/s?q={encoded_query}"
+        print(f"Fetching search page to get dynamic build ID from: {initial_url}")
+    else:
+        # Default to the watches category page if no search query
+        initial_url = "https://www.catawiki.com/en/c/333-watches"
+        print(f"Fetching category page to get dynamic build ID from: {initial_url}")
+
     try:
-        response = requests.get(CATAWIKI_WATCHES_PAGE_URL)
+        response = requests.get(initial_url)
         response.raise_for_status()  # Raise an exception for HTTP errors
         soup = BeautifulSoup(response.text, 'html.parser')
 
@@ -41,10 +46,8 @@ def get_dynamic_base_url():
             build_id = data.get("buildId")
 
             if build_id:
-                dynamic_base_url = API_URL_TEMPLATE.format(build_id=build_id)
                 print(f"Successfully extracted build ID: {build_id}")
-                print(f"Dynamic BASE_URL set to: {dynamic_base_url}")
-                return dynamic_base_url
+                return build_id
             else:
                 print("Error: 'buildId' not found in __NEXT_DATA__ script.")
                 return None
@@ -52,36 +55,67 @@ def get_dynamic_base_url():
             print("Error: __NEXT_DATA__ script tag not found on the page.")
             return None
     except requests.exceptions.RequestException as e:
-        print(f"Error fetching main page: {e}")
+        print(f"Error fetching initial page ({initial_url}): {e}")
         return None
     except json.JSONDecodeError as e:
         print(f"Error parsing JSON from __NEXT_DATA__ script: {e}")
         return None
     except Exception as e:
-        print(f"An unexpected error occurred while getting dynamic BASE_URL: {e}")
+        print(f"An unexpected error occurred while getting dynamic build ID: {e}")
         return None
 
 
-def fetch_page(page_num, base_url):
+def fetch_page(page_num, build_id, search_query=None, sort_param="bidding_end_desc",
+               filters_param="reserve_price%5B%5D=0&budget%5B%5D=-100"):
     """
-    Fetches a single page of watch listings from Catawiki using the provided base_url.
+    Fetches a single page of watch listings from Catawiki using the provided build_id,
+    search query, sort, and filters.
     """
+    # Determine the API path segment based on whether a search query is present
+    if search_query:
+        api_path_segment = "en/s.json"
+    else:
+        api_path_segment = "en/c/333-watches.json"  # Default category path
+
+    base_api_url = f"https://www.catawiki.com/_next/data/{build_id}/{api_path_segment}"
+
     params = {
-        "sort": "bidding_end_desc",  # user generated sort
-        "filters": "reserve_price%5B%5D=0&budget%5B%5D=-100",  # user generated filter
-        "category": "333-watches",
+        "sort": sort_param,
+        "filters": filters_param,
         "page": page_num
     }
-    print(f"Fetching page {page_num}...")
+
+    # Add search query parameter if provided
+    if search_query:
+        params["q"] = search_query
+    else:
+        # If no search query, ensure the category is set for the default path
+        params["category"] = "333-watches"
+
+    print(f"Fetching page {page_num} for query '{search_query if search_query else 'watches category'}'...")
     try:
-        response = requests.get(base_url, params=params)
+        response = requests.get(base_api_url, params=params)
         response.raise_for_status()  # Raise an exception for HTTP errors
         data = response.json()
-        lots = data["pageProps"]["categoryLots"]["lots"]
-        total_lots = data["pageProps"]["categoryLots"]["total"]
+
+        # The structure of the JSON response changes slightly for search results
+        if search_query:
+            lots = data["pageProps"]["searchLots"]["lots"]
+            total_lots = data["pageProps"]["searchLots"]["total"]
+        else:
+            lots = data["pageProps"]["categoryLots"]["lots"]
+            total_lots = data["pageProps"]["categoryLots"]["total"]
+
         return lots, total_lots
     except requests.exceptions.RequestException as e:
-        print(f"Error fetching page {page_num}: {e}")
+        print(f"Error fetching page {page_num} from {base_api_url} with params {params}: {e}")
+        return [], 0
+    except KeyError as e:
+        print(
+            f"Error parsing JSON response (missing key {e}). Response structure might have changed or no results for query. Response: {data}")
+        return [], 0
+    except Exception as e:
+        print(f"An unexpected error occurred while fetching page: {e}")
         return [], 0
 
 
@@ -212,19 +246,34 @@ def get_market_estimate(title, buy_now_price, price_for_valuation):
 def main():
     """
     Main function to orchestrate fetching data, getting estimates, and displaying results.
+    Configurable with direct parameters for search keyword, sort, filters, and lot limit.
     """
-    max_lots = 5  # limit total lots to fetch for demonstration
+    # --- Configuration Parameters ---
+    # Set your desired search keyword (e.g., "omega", "rolex", or None for general watches)
+    search_keyword = "omega"  # Set to None for general watches category
 
-    # Get the dynamic BASE_URL
-    dynamic_base_url = get_dynamic_base_url()
-    if not dynamic_base_url:
-        print("Could not determine dynamic BASE_URL. Exiting.")
+    # Set your desired sort option
+    # Options: "bidding_end_desc", "bidding_end_asc", "price_desc", "price_asc"
+    sort_option = "bidding_end_desc"
+
+    # Set your desired filters (URL-encoded format, combine with '&')
+    filters_string = "reserve_price%5B%5D=0&budget%5B%5D=-500"
+
+    # Set maximum number of lots to fetch
+    # Set to a very high number (e.g., 999999) for a full scrape (be mindful of API rate limits!)
+    max_lots = 5
+    # --- End Configuration Parameters ---
+
+    # Get the dynamic BUILD_ID based on the search query (or lack thereof)
+    build_id = get_dynamic_build_id(search_query=search_keyword)
+    if not build_id:
+        print("Could not determine dynamic build ID. Exiting.")
         return
 
     all_records = []
 
     # Fetch first page to get total lots and lots per page
-    first_page_lots, total_lots = fetch_page(1, dynamic_base_url)
+    first_page_lots, total_lots = fetch_page(1, build_id, search_keyword, sort_option, filters_string)
     if not first_page_lots:
         print("No lots found or error fetching the first page. Exiting.")
         return
@@ -242,7 +291,7 @@ def main():
     for page_num in range(2, total_pages + 1):
         if len(all_records) >= max_lots:
             break
-        lots, _ = fetch_page(page_num, dynamic_base_url)
+        lots, _ = fetch_page(page_num, build_id, search_keyword, sort_option, filters_string)
         if not lots:
             break
         records = parse_lots_to_records(lots)
@@ -314,16 +363,16 @@ def main():
     ]
     df = df[final_columns_order]
 
-    print("\n--- Final Results ---")
+    print("\n--- All Results ---")
     print(df.to_string())
 
     # Save to CSV:
     df.to_csv("catawiki_watches_with_gemini_valuation.csv", index=False)
+    print("\nData saved to catawiki_watches_with_gemini_valuation.csv")
 
     # Save to JSON:
-    # Orient='records' will save each row as a JSON object in a list, which is often convenient
     df.to_json("catawiki_watches_with_gemini_valuation.json", orient="records", indent=4)
-    print("\nData saved to catawiki_watches_with_gemini_valuation.json")
+    print("Data saved to catawiki_watches_with_gemini_valuation.json")
 
 
 if __name__ == "__main__":

@@ -4,14 +4,14 @@ This project is a tool for watch enthusiasts to analyze watch prices on Catawiki
 
 ## Description
 
-This script scrapes watch auction data from Catawiki, analyzes it using the Gemini API, and provides insights into pricing trends. It's a fun project for anyone interested in watches and data analysis.
-Data are returned and save, both in `.csv` and `.json` format 
+This script scrapes watch auction data from Catawiki, analyzes it using Google's Gemini API, and provides insights into pricing trends. It's a fun project for anyone interested in watches and data analysis.
+The script uses the powerful and free `gemini-2.0-flash` model to provide market estimates. Data is returned and saved in both `.csv` and `.json` formats.
 
 ## Features
 
 *   Scrapes watch data from Catawiki.
-*   Analyzes prices using the Gemini API.
-*   Allows customization of scraping parameters, including filter sorting and lot limits.
+*   Analyzes prices using the free Gemini API (`gemini-2.0-flash` model).
+*   Allows customization of scraping parameters, including search keyword, sorting, filters, and lot limits.
 
 ## Setup
 
@@ -27,10 +27,11 @@ Data are returned and save, both in `.csv` and `.json` format
     ```
 
 3.  **Set up your Gemini API Key:**
-    You will need to obtain a Gemini API key from Google AI Studio. Once you have your key, create a `.env` file in the root of the project and add your key like this:
+    You will need to obtain a Gemini API key from Google AI Studio. Once you have your key, you can either set it as an environment variable or place it directly in the `main.py` script (not recommended for public repositories).
 
-    ```
-    GEMINI_API_KEY="your_api_key_here"
+    For example, in `main.py`:
+    ```python
+    GEMINI_API_KEY = "your_api_key_here"
     ```
 
 ## Usage
@@ -43,10 +44,12 @@ python main.py
 
 ### Customization
 
-You can customize the scraping process by modifying the following parameters in `main.py`:
+You can easily customize the scraping process by modifying the configuration parameters at the top of the `main()` function in `main.py`:
 
-*   **Filter Sorting:** Change the `sort` parameter to control the order of the scraped lots.
-*   **Lot Limit:** Adjust the `limit` parameter to change the number of lots to scrape. To perform a full scrape of all available lots, set this to a very high number.
+*   `search_keyword`: Set a search term like `"omega"` or `"rolex"`, or set it to `None` to browse the general watches category.
+*   `sort_option`: Controls the order of scraped lots. Options include `"bidding_end_desc"`, `"bidding_end_asc"`, `"price_desc"`, and `"price_asc"`.
+*   `filters_string`: Apply URL-encoded filters. For example, `"reserve_price%5B%5D=0&budget%5B%5D=-500"` filters for no-reserve auctions with a budget up to 500 EUR.
+*   `max_lots`: The maximum number of lots to fetch. Set to a high number for a full scrape, but be mindful of API rate limits.
 
 ## Disclaimer
 
