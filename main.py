@@ -7,18 +7,18 @@ from bs4 import BeautifulSoup  # Import BeautifulSoup for HTML parsing
 import numpy as np  # Import numpy for handling NaN values
 
 # Gemini API key will be provided by the environment, so we leave it empty here.
-# DO NOT hardcode your API key here.
-GEMINI_API_KEY = ""  # User provided key, keeping it.
+GEMINI_API_KEY = "" # Input your own key
 GEMINI_API_URL = "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent"
 
 # Base URL for the main watches page to extract the dynamic build ID
 CATAWIKI_WATCHES_PAGE_URL = "https://www.catawiki.com/en/c/333-watches"
+
 # Template for the dynamic API URL
 API_URL_TEMPLATE = "https://www.catawiki.com/_next/data/{build_id}/en/c/333-watches.json"
 
 # Constants for fee calculation
 CATAWIKI_BROKERAGE_FEE_PERCENTAGE = 0.09  # 9%
-FIXED_DELIVERY_FEE_EUR = 40.0  # Fixed delivery fee in EUR.
+FIXED_DELIVERY_FEE_EUR = 50.0  # Fixed delivery fee in EUR.
 
 
 def get_dynamic_base_url():
@@ -213,7 +213,7 @@ def main():
     """
     Main function to orchestrate fetching data, getting estimates, and displaying results.
     """
-    max_lots = 3  # limit total lots to fetch for demonstration
+    max_lots = 5  # limit total lots to fetch for demonstration
 
     # Get the dynamic BASE_URL
     dynamic_base_url = get_dynamic_base_url()
@@ -309,7 +309,7 @@ def main():
         "Delivery Fee (EUR)",
         "Final Price (EUR)",
         "Market Price Estimate (EUR)",
-        "Final Price vs. Market Est. Ratio",  # Updated column name
+        "Final Price vs. Market Est. Ratio",
         "Valuation"
     ]
     df = df[final_columns_order]
@@ -317,8 +317,13 @@ def main():
     print("\n--- Final Results ---")
     print(df.to_string())
 
-    # Optionally save to CSV:
+    # Save to CSV:
     df.to_csv("catawiki_watches_with_gemini_valuation.csv", index=False)
+
+    # Save to JSON:
+    # Orient='records' will save each row as a JSON object in a list, which is often convenient
+    df.to_json("catawiki_watches_with_gemini_valuation.json", orient="records", indent=4)
+    print("\nData saved to catawiki_watches_with_gemini_valuation.json")
 
 
 if __name__ == "__main__":
